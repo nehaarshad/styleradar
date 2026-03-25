@@ -1,77 +1,173 @@
-// app/login/page.tsx
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { login } from '@/services/auth'
+import { login, signup } from '@/app/(auth)/actions'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [form, setForm] = useState({ username: '', email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
-    const result = login(email)
-    
-    if (result.success) {
-      router.push('/upload')
-    } else {
-      setError(result.error || 'Invalid credentials')
+
+    try {
+      if (mode === 'login') {
+        const result = await login(form.email, form.password)
+        
+      } else {
+        const result = await signup(form.email, form.password, form.username)
+        
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+      console.error(err)
+    } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-indigo-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
-          <p className="text-gray-600 mt-2">Sign in to continue your style journey</p>
+    <div className="min-h-screen bg-[#FAF8F5] flex">
+      {/* Left – branding panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#1C1C1C] flex-col justify-between p-12 relative overflow-hidden">
+        {/* decorative blobs */}
+        <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-[#C9A96E] opacity-10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full bg-[#8B5E3C] opacity-10 blur-3xl" />
+
+        <div className="relative z-10">
+          <h1 className="text-white text-3xl font-bold tracking-tight">
+            Style<span className="text-[#C9A96E]">Radar</span>
+          </h1>
         </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-              placeholder="you@example.com"
-              required
-            />
+
+        <div className="relative z-10">
+          <p className="text-5xl font-bold text-white leading-tight mb-6">
+            Your taste.<br />
+            <span className="text-[#C9A96E]">Everywhere.</span>
+          </p>
+          <p className="text-[#A0A0A0] text-lg max-w-md">
+            Upload 5 outfits you already love. AI decodes your style DNA and
+            builds a live, shoppable feed from Khaadi, Limelight, Satrangi — every morning.
+          </p>
+        </div>
+
+        <div className="relative z-10 flex gap-6">
+          {['Khaadi', 'Limelight', 'Satrangi'].map((brand) => (
+            <span
+              key={brand}
+              className="text-[#C9A96E] text-sm font-medium border border-[#C9A96E]/30 px-3 py-1 rounded-full"
+            >
+              {brand}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Right – form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-8 py-12">
+        <div className="w-full max-w-md">
+          <div className="lg:hidden mb-8">
+            <h1 className="text-2xl font-bold text-[#1C1C1C]">
+              Style<span className="text-[#C9A96E]">Radar</span>
+            </h1>
           </div>
-      
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-        
-        <p className="text-center mt-6 text-sm text-gray-600">
-         {`Don't have an account?{' '}`}
-          <Link href="/signup" className="text-indigo-600 hover:text-indigo-500 font-medium">
-            Sign up
-          </Link>
-        </p>
+
+          <h2 className="text-2xl font-bold text-[#1C1C1C] mb-2">
+            {mode === 'login' ? 'Welcome back' : 'Create your account'}
+          </h2>
+          <p className="text-[#6B6B6B] mb-8 text-sm">
+            {mode === 'login'
+              ? 'Sign in to your personalised feed'
+              : 'Start discovering fashion matched to your taste'}
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-medium text-[#4A4A4A] mb-1">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={form.username}
+                  onChange={update('username')}
+                  required
+                  placeholder="fashionista_pk"
+                  className="w-full border border-[#E0DDD8] rounded-lg px-4 py-3 text-sm text-[#1C1C1C] placeholder-[#B0ADA8] focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50 bg-white"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-[#4A4A4A] mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={update('email')}
+                required
+                placeholder="you@example.com"
+                className="w-full border border-[#E0DDD8] rounded-lg px-4 py-3 text-sm text-[#1C1C1C] placeholder-[#B0ADA8] focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50 bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#4A4A4A] mb-1">
+                Password
+              </label>
+              <input
+                type="password"
+                value={form.password}
+                onChange={update('password')}
+                required
+                minLength={6}
+                placeholder="••••••••"
+                className="w-full border border-[#E0DDD8] rounded-lg px-4 py-3 text-sm text-[#1C1C1C] placeholder-[#B0ADA8] focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50 bg-white"
+              />
+            </div>
+
+            {error && (
+              <p className="text-red-500 text-sm bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#1C1C1C] text-white py-3 rounded-lg font-medium text-sm hover:bg-[#2E2E2E] transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading
+                ? mode === 'login'
+                  ? 'Signing in…'
+                  : 'Creating account…'
+                : mode === 'login'
+                ? 'Sign In'
+                : 'Create Account'}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-[#6B6B6B]">
+            {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login')
+                setError('')
+              }}
+              className="text-[#C9A96E] font-medium hover:underline"
+            >
+              {mode === 'login' ? 'Sign up' : 'Sign in'}
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   )

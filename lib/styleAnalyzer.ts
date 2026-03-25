@@ -1,42 +1,74 @@
 import { StyleDNAModel } from '@/model/userStyleDNA'
 import { StyleProfile } from '@/model/userStyleprofile'
+import { userUploadedImagesModel } from '@/model/userUploadedImages'
 import { v4 as uuidv4 } from 'uuid'
-import { userUploadedImagesModel } from '../model/userUploadedImages'
 
-export const saveStyleAnalysis = (userId: string, styleDNA: StyleDNAModel) => {
-  const key = `style_dna_${userId}`
-  localStorage.setItem(key, JSON.stringify({
-    ...styleDNA,
-    analyzedAt: Date.now()
-  }))
+const dnaKey = (userId: string) => `style_dna_${userId}`
+const profilesKey = 'styleProfiles'
+
+export function saveStyleAnalysis(userId: string, styleDNA: StyleDNAModel): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(
+    dnaKey(userId),
+    JSON.stringify({ ...styleDNA, analyzedAt: Date.now() })
+  )
 }
 
-export const getStyleAnalysis = (userId: string): StyleDNAModel | null => {
-  const key = `style_dna_${userId}`
-  const data = localStorage.getItem(key)
-  return data ? JSON.parse(data) : null
+export function getStyleAnalysis(userId: string): StyleDNAModel | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(dnaKey(userId))
+    return raw ? (JSON.parse(raw) as StyleDNAModel) : null
+  } catch {
+    return null
+  }
 }
 
-export const saveStyleProfile = (userId: string, images: userUploadedImagesModel[], styleDNA?: StyleDNAModel) => {
-  const profiles = localStorage.getItem('styleProfiles')
-  const allProfiles = profiles ? JSON.parse(profiles) : []
-  
-  const existingIndex = allProfiles.findIndex((p: StyleProfile) => p.userId === userId)
-  
-  const newProfile: StyleProfile = {
-    id: uuidv4(),
+
+
+export function saveStyleProfile(
+  userId: string,
+  images: userUploadedImagesModel[],
+  styleDNA?: StyleDNAModel
+): StyleProfile {
+  if (typeof window === 'undefined') throw new Error('Server-side call')
+
+  const allProfiles: StyleProfile[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(profilesKey) ?? '[]')
+    } catch {
+      return []
+    }
+  })()
+
+  const existingIdx = allProfiles.findIndex((p) => p.userId === userId)
+
+  const profile: StyleProfile = {
+    id: existingIdx >= 0 ? allProfiles[existingIdx].id : uuidv4(),
     userId,
     uploadedImages: images,
-    styleDNA: styleDNA || undefined,
-    createdAt: Date.now()
+    styleDNA,
+    createdAt: Date.now(),
   }
-  
-  if (existingIndex >= 0) {
-    allProfiles[existingIndex] = { ...allProfiles[existingIndex], ...newProfile }
+
+  if (existingIdx >= 0) {
+    allProfiles[existingIdx] = profile
   } else {
-    allProfiles.push(newProfile)
+    allProfiles.push(profile)
   }
-  
-  localStorage.setItem('styleProfiles', JSON.stringify(allProfiles))
-  return newProfile
+
+  localStorage.setItem(profilesKey, JSON.stringify(allProfiles))
+  return profile
+}
+
+export function getStyleProfile(userId: string): StyleProfile | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const allProfiles: StyleProfile[] = JSON.parse(
+      localStorage.getItem(profilesKey) ?? '[]'
+    )
+    return allProfiles.find((p) => p.userId === userId) ?? null
+  } catch {
+    return null
+  }
 }

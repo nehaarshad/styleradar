@@ -1,241 +1,243 @@
-
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { getSession } from '@/services/auth'
 import { saveUploadedImages } from '@/lib/userUploadedImagesStorage'
-import {  saveStyleProfile, saveStyleAnalysis } from '@/lib/styleAnalyzer'
+import { saveStyleProfile, saveStyleAnalysis } from '@/lib/styleAnalyzer'
 import { userUploadedImagesModel } from '@/model/userUploadedImages'
-import { v4 as uuidv4 } from 'uuid'
 import { userModel } from '@/model/user'
+import { v4 as uuidv4 } from 'uuid'
+
+const MAX_IMAGES = 5
+const MAX_SIZE_MB = 4
+
+const STEPS = [
+  'Preparing your images…',
+  'Reading colour palette…',
+  'Detecting silhouettes & fabrics…',
+  'Building your Style DNA…',
+  'Almost ready — personalising your feed…',
+]
 
 export default function UploadPage() {
   const router = useRouter()
   const [user, setUser] = useState<userModel | null>(null)
   const [images, setImages] = useState<userUploadedImagesModel[]>([])
-  const [loading, setLoading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
-  const [analysisStep, setAnalysisStep] = useState('')
+  const [stepIndex, setStepIndex] = useState(0)
   const [error, setError] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
     const session = getSession()
-    if (!session) {
-      router.push('/login')
-    } else {
-      setUser(session)
-    }
+    if (!session) router.push('/login')
+    else setUser(session)
   }, [router])
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
+  // Cycle through analysis steps
+  useEffect(() => {
+    if (!analyzing) return
+    const id = setInterval(() => {
+      setStepIndex((prev) => (prev + 1 < STEPS.length ? prev + 1 : prev))
+    }, 1800)
+    return () => clearInterval(id)
+  }, [analyzing])
 
-    // Limit to 5 images
-    if (images.length + files.length > 5) {
-      alert('You can only upload up to 5 images')
-      return
-    }
+  const processFiles = useCallback(
+    (files: FileList | File[]) => {
+      setError('')
+      const remaining = MAX_IMAGES - images.length
+      if (remaining <= 0) return
 
-    setLoading(true)
-    setError('')
+      const newFiles = Array.from(files).slice(0, remaining)
 
-    Array.from(files).forEach(file => {
-      // Check file size (limit to 4MB per image for Gemini)
-      if (file.size > 4 * 1024 * 1024) {
-        alert('Please upload images smaller than 4MB')
-        return
-      }
-
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        const newImage: userUploadedImagesModel = {
-          id: uuidv4(),
-          image_url: event.target?.result as string,
-
+      newFiles.forEach((file) => {
+        if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+          setError(`"${file.name}" exceeds ${MAX_SIZE_MB}MB — please choose a smaller image.`)
+          return
         }
-        setImages(prev => [...prev, newImage])
-      }
-      reader.readAsDataURL(file)
-    })
+        if (!file.type.startsWith('image/')) return
 
-    setLoading(false)
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setImages((prev) =>
+            prev.length < MAX_IMAGES
+              ? [...prev, { id: uuidv4(), image_url: e.target?.result as string }]
+              : prev
+          )
+        }
+        reader.readAsDataURL(file)
+      })
+    },
+    [images.length]
+  )
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) processFiles(e.target.files)
+    e.target.value = ''
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (e.dataTransfer.files) processFiles(e.dataTransfer.files)
   }
 
   const removeImage = (id: string) => {
-    setImages(prev => prev.filter(img => img.id !== id))
+    if (analyzing) return
+    setImages((prev) => prev.filter((img) => img.id !== id))
     setError('')
   }
 
-  const analyzeWithGemini = async () => {
-    if (images.length !== 5) {
-      alert('Please upload exactly 5 images')
-      return
-    }
-
+  const analyse = async () => {
+    if (images.length !== MAX_IMAGES || !user) return
     setAnalyzing(true)
+    setStepIndex(0)
     setError('')
-    setAnalysisStep('Preparing images...')
 
     try {
-      // Save images to storage first
-      saveUploadedImages(user?.id ?? "", images)
-      
-      setAnalysisStep('Analyzing your style with Gemini AI...')
-      
-      // Call our API route
-      const response = await fetch('/api/analyze-style', {
+      saveUploadedImages(user.id, images)
+
+      const res = await fetch('/api/analyze-style', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          images: images.map(img => img.image_url)
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: images.map((i) => i.image_url) }),
       })
 
-      console.log('API response status:', response.status)
-      if (!response.ok) {
-        throw new Error('Analysis failed')
-      }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Analysis failed')
 
-      const data = await response.json()
-      
-      setAnalysisStep('Saving your style profile...')
-      
-      // Save the style analysis
-      saveStyleAnalysis(user?.id ?? "", data.styleDNA)
-      
-      // Update style profile with DNA
-      saveStyleProfile(user?.id ?? "", images, data.styleDNA)
-      
-      setAnalysisStep('Complete! Redirecting to your feed...')
-      
-      // Redirect to feed
-      setTimeout(() => {
-        router.push('/feed')
-      }, 1000)
-      
-    } catch (error) {
-      console.error('Analysis error:', error)
-      setError('Failed to analyze style. Please try again.')
+      saveStyleAnalysis(user.id, data.styleDNA)
+      saveStyleProfile(user.id, images, data.styleDNA)
+
+      router.push('/feed')
+    } catch (err) {
+      setError((err as Error).message || 'Failed to analyse style. Please try again.')
       setAnalyzing(false)
     }
   }
 
   if (!user) return null
 
+  const slots = Array.from({ length: MAX_IMAGES })
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-indigo-600">StyleRadar</h1>
-            <span className="text-sm text-gray-600">Welcome, {user.username}</span>
-          </div>
-        </div>
+    <div className="min-h-screen bg-[#FAF8F5]">
+      {/* Nav */}
+      <nav className="bg-white border-b border-[#ECEAE6] px-6 py-4 flex justify-between items-center sticky top-0 z-20">
+        <h1 className="text-xl font-bold text-[#1C1C1C]">
+          Style<span className="text-[#C9A96E]">Radar</span>
+        </h1>
+        <span className="text-sm text-[#6B6B6B]">Welcome, {user.username}</span>
       </nav>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-12">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Upload 5 Outfits You Love</h2>
-          <p className="text-gray-600 mt-2">
-            From Instagram, Pinterest, or your camera roll. Gemini AI will analyze your style.
+      <main className="max-w-3xl mx-auto px-4 py-12">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#C9A96E] mb-3">
+            Step 1 of 1
+          </p>
+          <h2 className="text-4xl font-bold text-[#1C1C1C] leading-tight mb-3">
+            Upload 5 Outfits<br />You Already Love
+          </h2>
+          <p className="text-[#6B6B6B] text-base max-w-md mx-auto">
+            Screenshots from Instagram, Pinterest saves, photos from your camera roll — anything goes.
+            Gemini AI will decode your Style DNA in seconds.
           </p>
         </div>
 
-        {/* Upload Area */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            {images.map((image, index) => (
-              <div key={image.id} className="relative aspect-square group">
-                <Image
-                  src={image.image_url}
-                  alt={`Upload ${index + 1}`}
-                  fill
-                  className="object-cover rounded-lg"
-                />
-                <button
-                  onClick={() => removeImage(image.id)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 opacity-0 group-hover:opacity-100 transition"
-                  disabled={analyzing}
+        {/* Upload zone */}
+        <div
+          className={`bg-white rounded-2xl border-2 ${
+            isDragging ? 'border-[#C9A96E] bg-[#FDF9F3]' : 'border-[#E8E5E0]'
+          } p-6 mb-6 transition-colors`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+        >
+          <div className="grid grid-cols-5 gap-3 mb-4">
+            {slots.map((_, idx) => {
+              const img = images[idx]
+              if (img) {
+                return (
+                  <div key={img.id} className="relative aspect-square group rounded-xl overflow-hidden shadow-sm">
+                    <Image src={img.image_url} alt={`Outfit ${idx + 1}`} fill className="object-cover" />
+                    <button
+                      onClick={() => removeImage(img.id)}
+                      disabled={analyzing}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-black"
+                    >
+                      ×
+                    </button>
+                    <div className="absolute bottom-1.5 left-1.5 w-5 h-5 bg-[#C9A96E] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {idx + 1}
+                    </div>
+                  </div>
+                )
+              }
+              return (
+                <label
+                  key={idx}
+                  className={`aspect-square rounded-xl border-2 border-dashed ${
+                    isDragging ? 'border-[#C9A96E]' : 'border-[#D8D4CE]'
+                  } flex flex-col items-center justify-center cursor-pointer hover:border-[#C9A96E] hover:bg-[#FDF9F3] transition`}
                 >
-                  ×
-                </button>
-                <div className="absolute top-2 left-2 bg-indigo-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                  {index + 1}
-                </div>
-              </div>
-            ))}
-            
-            {images.length < 5 && (
-              <label className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 transition">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={loading || analyzing}
-                />
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span className="text-xs text-gray-500 mt-1">Add Image</span>
-              </label>
-            )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileInput}
+                    className="hidden"
+                    disabled={analyzing}
+                  />
+                  <svg className="w-6 h-6 text-[#C0BDB8] mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span className="text-[10px] text-[#B0ADA8] font-medium">Photo {idx + 1}</span>
+                </label>
+              )
+            })}
           </div>
 
-          <p className="text-sm text-gray-500 text-center mb-4">
-            {images.length}/5 images uploaded
+          <p className="text-center text-xs text-[#A0A0A0]">
+            {images.length}/{MAX_IMAGES} photos · Drag & drop or click to add
           </p>
-
-          {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
-              {error}
-            </div>
-          )}
-
-          {analyzing && (
-            <div className="bg-indigo-50 p-4 rounded-lg mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
-                <p className="text-indigo-700 text-sm">{analysisStep}</p>
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={analyzeWithGemini}
-            disabled={images.length !== 5 || analyzing}
-            className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {analyzing ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {analysisStep}
-              </span>
-            ) : (
-              'Analyze My Style with Gemini AI →'
-            )}
-          </button>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3 mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Analysis progress */}
+        {analyzing && (
+          <div className="bg-[#1C1C1C] rounded-xl px-6 py-4 mb-4 flex items-center gap-4">
+            <div className="w-5 h-5 border-2 border-[#C9A96E] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            <p className="text-white text-sm font-medium">{STEPS[stepIndex]}</p>
+          </div>
+        )}
+
+        {/* CTA */}
+        <button
+          onClick={analyse}
+          disabled={images.length !== MAX_IMAGES || analyzing}
+          className="w-full bg-[#1C1C1C] text-white py-4 rounded-xl font-semibold text-base hover:bg-[#2E2E2E] transition disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {analyzing ? 'Analysing your style…' : 'Analyse My Style with Gemini AI →'}
+        </button>
+
         {/* Tips */}
-        <div className="bg-indigo-50 rounded-lg p-4">
-          <h3 className="font-medium text-indigo-900 mb-2">✨ Gemini AI Style Analysis Tips:</h3>
-          <ul className="text-sm text-indigo-700 space-y-1">
-            <li>• Choose clear, well-lit photos</li>
-            <li>• Include full outfit shots when possible</li>
-            <li>• Mix different style categories</li>
-            <li>• Images should be under 4MB each</li>
+        <div className="mt-8 bg-[#F5F1EB] rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-[#1C1C1C] mb-3">✨ Tips for best results</h3>
+          <ul className="space-y-1.5 text-sm text-[#6B6B6B]">
+            <li>• Choose clear, well-lit full-body shots</li>
+            <li>• Mix different occasions — casual, formal, festive</li>
+            <li>• Include Pakistani or South Asian outfits for localised matches</li>
+            <li>• Keep images under 4 MB each</li>
           </ul>
         </div>
       </main>

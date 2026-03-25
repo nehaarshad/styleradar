@@ -1,4 +1,4 @@
 export interface userUploadedImagesModel {
-  id: string,
-  image_url: string,
+  id: string
+  image_url: string
 }

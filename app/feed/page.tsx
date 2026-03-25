@@ -1,177 +1,137 @@
-// app/feed/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { getSession, logout } from '@/services/auth'
 import { getUploadedImages } from '@/lib/userUploadedImagesStorage'
-import {  getStyleAnalysis, } from '@/lib/styleAnalyzer'
+import { getStyleAnalysis } from '@/lib/styleAnalyzer'
 import { userModel } from '@/model/user'
 import { userUploadedImagesModel } from '@/model/userUploadedImages'
 import { StyleDNAModel } from '@/model/userStyleDNA'
-
-// Mock product data (in real app, this would be filtered based on style DNA)
-const MOCK_PRODUCTS = [
-  {
-    id: 1,
-    image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400',
-    brand: 'Zara',
-    price: 89,
-    description: 'Elegant Floral Dress',
-    styleTags: ['feminine', 'floral', 'dress']
-  },
-  {
-    id: 2,
-    image: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400',
-    brand: 'H&M',
-    price: 49,
-    description: 'Classic White T-Shirt',
-    styleTags: ['basics', 'minimalist', 'casual']
-  },
-  {
-    id: 3,
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400',
-    brand: 'Nike',
-    price: 120,
-    description: 'Air Max 270',
-    styleTags: ['sneakers', 'sporty', 'streetwear']
-  },
-  {
-    id: 4,
-    image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400',
-    brand: 'Levi\'s',
-    price: 79,
-    description: 'High-Waist Jeans',
-    styleTags: ['denim', 'casual', 'basics']
-  },
-  {
-    id: 5,
-    image: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=400',
-    brand: 'Mango',
-    price: 59,
-    description: 'Leather Jacket',
-    styleTags: ['edgy', 'outerwear', 'statement']
-  },
-  {
-    id: 6,
-    image: 'https://images.unsplash.com/photo-1584670747417-594a9412fba5?w=400',
-    brand: 'Adidas',
-    price: 85,
-    description: 'Ultraboost Shoes',
-    styleTags: ['sneakers', 'sporty', 'comfort']
-  }
-]
+import { ProductModel } from '@/model/product'
+import { ProductCard } from '../components/ui/productCard'
+import { MatchBadge } from '../components/ui/matchBadge'
+import LogoutButton from '../components/ui/logoutbutton'
 
 export default function FeedPage() {
   const router = useRouter()
   const [user, setUser] = useState<userModel | null>(null)
+  const [products, setProducts] = useState<ProductModel[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [uploadedImages, setUploadedImages] = useState<userUploadedImagesModel[]>([])
   const [styleDNA, setStyleDNA] = useState<StyleDNAModel | null>(null)
-  const [savedItems, setSavedItems] = useState<unknown[]>([])
-  const [showStyleInsights, setShowStyleInsights] = useState(false)
+  const [showDNA, setShowDNA] = useState(false)
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [usingMock, setUsingMock] = useState(false)
+
+  const loadProducts = useCallback(async (dna: StyleDNAModel) => {
+    setLoading(true)
+    setLoadError('')
+    setUsingMock(false)
+
+    try {
+      const res = await fetch('/api/scrape-products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          styleDNA: dna,
+          retailers: ['limelight', 'khaadi', 'satrangi'],
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to load products')
+
+      if (data.products?.length > 0) {
+        setProducts(data.products)
+      } else {
+       
+        setUsingMock(true)
+      }
+    } catch (err) {
+      console.error('Feed error:', err)
+    
+      setUsingMock(true)
+      setLoadError('Could not reach retailers — showing curated examples.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const createSession =() => {
-        const session = getSession()
-    if (!session) {
-      router.push('/login')
-    } else {
-      setUser(session)
-      const images = getUploadedImages(session.id)
-      setUploadedImages(images)
-      
-      const dna = getStyleAnalysis(session.id)
-      setStyleDNA(dna)
-      
+    const session = getSession()
+    if (!session) { router.push('/login'); return }
 
-    }
-    }
-    
-    createSession()
-  }, [router])
+    setUser(session)
+    setUploadedImages(getUploadedImages(session.id))
 
+    const dna = getStyleAnalysis(session.id)
+    setStyleDNA(dna)
+    if (dna) loadProducts(dna)
+  }, [router, loadProducts])
+
+  const toggleSave = (p: ProductModel) => {
+    setSavedIds((prev) => {
+      const next = new Set(prev)
+      next.has(p.id) ? next.delete(p.id) : next.add(p.id)
+      return next
+    })
+  }
 
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-[#FAF8F5]">
+      {/* Nav */}
+      <nav className="bg-white border-b border-[#ECEAE6] sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-bold text-indigo-600">StyleRadar</h1>
-              <span className="text-sm text-gray-500">Your Daily Style Feed</span>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-[#1C1C1C]">
+                Style<span className="text-[#C9A96E]">Radar</span>
+              </h1>
+              <span className="hidden sm:block text-sm text-[#A0A0A0]">Your Daily Feed</span>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3">
+              {styleDNA && (
+                <button
+                  onClick={() => setShowDNA(!showDNA)}
+                  className="text-xs bg-[#F5F1EB] text-[#8B5E3C] px-3 py-1.5 rounded-full hover:bg-[#EDE7DC] transition font-medium"
+                >
+                  {showDNA ? 'Hide' : 'View'} Style DNA
+                </button>
+              )}
               <button
-                onClick={() => setShowStyleInsights(!showStyleInsights)}
-                className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full hover:bg-indigo-100"
+                onClick={() => router.push('/upload')}
+                className="text-xs text-[#6B6B6B] hover:text-[#1C1C1C] transition"
               >
-                {showStyleInsights ? 'Hide' : 'Show'} Style DNA
+                Re-upload
               </button>
-              <button
-                onClick={() => {
-                  logout()
-                  router.push('/login')
-                }}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Logout
-              </button>
+              <LogoutButton />
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Style DNA Insights Panel */}
-      {showStyleInsights && styleDNA && (
-        <div className="bg-indigo-600 text-white">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <h2 className="text-lg font-semibold mb-3">✨ Your Style DNA (Analyzed by Gemini AI)</h2>
-            <p className="text-indigo-100 mb-4">{styleDNA.description}</p>
-            
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-              <div>
-                <div className="font-medium text-indigo-200">Silhouettes</div>
-                <div className="text-white">{styleDNA.silhouettePrefs?.join(', ')}</div>
-              </div>
-              <div>
-                <div className="font-medium text-indigo-200">Colors</div>
-                <div className="text-white">{styleDNA.colorPalette?.join(', ')}</div>
-              </div>
-              <div>
-                <div className="font-medium text-indigo-200">Fabrics</div>
-                <div className="text-white">{styleDNA.fabricTypes?.join(', ')}</div>
-              </div>
-              <div>
-                <div className="font-medium text-indigo-200">Occasion</div>
-                <div className="text-white">{styleDNA.occasionStyle}</div>
-              </div>
-              <div>
-                <div className="font-medium text-indigo-200">Aesthetic</div>
-                <div className="text-white">{styleDNA.aestheticKeywords?.join(', ')}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Your Style Preview */}
-      {uploadedImages.length > 0 && (
-        <div className="bg-white border-b">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Your Style Inspiration</h2>
-            <div className="flex space-x-4 overflow-x-auto pb-2">
-              {uploadedImages.map((img, idx) => (
-                <div key={img.id} className="flex-shrink-0 w-20 h-20 relative rounded-lg overflow-hidden">
-                  <Image
-                    src={img.image_url}
-                    alt={`Style ${idx + 1}`}
-                    fill
-                    className="object-cover"
-                  />
+      {/* Style DNA Panel */}
+      {showDNA && styleDNA && (
+        <div className="bg-[#1C1C1C] text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <p className="text-[#C9A96E] text-xs font-semibold uppercase tracking-widest mb-2">Your Style DNA</p>
+            <p className="text-[#D0CCC8] text-sm mb-5 max-w-2xl">{styleDNA.description}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
+              {[
+                { label: 'Aesthetic', values: styleDNA.aestheticKeywords },
+                { label: 'Colours', values: styleDNA.colorPalette },
+                { label: 'Fabrics', values: styleDNA.fabricTypes },
+                { label: 'Silhouettes', values: styleDNA.silhouettePrefs },
+                { label: 'Occasion', values: [styleDNA.occasionStyle] },
+              ].map(({ label, values }) => (
+                <div key={label}>
+                  <p className="text-[#8B8884] text-xs uppercase tracking-wide mb-1">{label}</p>
+                  <p className="text-white capitalize">{values?.join(', ')}</p>
                 </div>
               ))}
             </div>
@@ -179,67 +139,105 @@ export default function FeedPage() {
         </div>
       )}
 
-      {/* Feed */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Style Match Badge */}
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Recommended for You</h2>
-          <span className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
-            Based on your style DNA
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {MOCK_PRODUCTS.map((product) => (
-            <div key={product.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
-              <div className="relative h-64">
-                <Image
-                  src={product.image}
-                  alt={product.description}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="font-medium text-gray-900">{product.brand}</h3>
-                    <p className="text-sm text-gray-600">{product.description}</p>
-                  </div>
-                  <span className="font-bold text-indigo-600">${product.price}</span>
+      {/* Uploaded images strip */}
+      {uploadedImages.length > 0 && (
+        <div className="bg-white border-b border-[#ECEAE6]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#A0A0A0] mb-3">Your Style Inspiration</p>
+            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+              {uploadedImages.map((img, i) => (
+                <div key={img.id} className="flex-shrink-0 w-16 h-16 relative rounded-xl overflow-hidden shadow-sm">
+                  <Image src={img.image_url} alt={`Inspiration ${i + 1}`} fill className="object-cover" />
                 </div>
-                
-                {/* Style match indicator */}
-                {styleDNA && (
-                  <div className="flex items-center space-x-1 mb-3">
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                      95% Match
-                    </span>
-                    {product.styleTags.map(tag => (
-                      <span key={tag} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                
-                <div className="flex space-x-2 mt-4">
-                  
-                  <button className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
-                    Shop Now
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-[#1C1C1C]">Recommended for You</h2>
+            <p className="text-sm text-[#A0A0A0] mt-0.5">
+              {loading
+                ? 'Finding products that match your style…'
+                : usingMock
+                ? 'Curated examples while your feed loads'
+                : `${products.length} items matched to your Style DNA`}
+            </p>
+          </div>
+          {styleDNA && !loading && (
+            <button
+              onClick={() => loadProducts(styleDNA)}
+              className="text-xs font-medium text-[#C9A96E] border border-[#C9A96E]/40 px-3 py-1.5 rounded-full hover:bg-[#FDF9F3] transition"
+            >
+              Refresh Feed
+            </button>
+          )}
         </div>
 
-        {/* Load More */}
-        <div className="text-center mt-8">
-          <button className="bg-white text-indigo-600 border border-indigo-600 px-6 py-2 rounded-lg hover:bg-indigo-50 transition font-medium">
-            Load More
-          </button>
-        </div>
+        {/* Error banner */}
+        {loadError && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm px-4 py-3 rounded-xl mb-6">
+            {loadError}
+          </div>
+        )}
+
+        {/* Skeleton loader */}
+        {loading && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm animate-pulse">
+                <div className="aspect-[3/4] bg-[#F0EDE8]" />
+                <div className="p-4 space-y-2">
+                  <div className="h-3 bg-[#F0EDE8] rounded w-1/3" />
+                  <div className="h-4 bg-[#F0EDE8] rounded w-3/4" />
+                  <div className="h-3 bg-[#F0EDE8] rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Products grid */}
+        {!loading && products.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onSave={toggleSave}
+                saved={savedIds.has(product.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* No products */}
+        {!loading && products.length === 0 && (
+          <div className="text-center py-20">
+            <p className="text-[#A0A0A0] text-base mb-4">No products found. Try refreshing or updating your style photos.</p>
+            <button
+              onClick={() => router.push('/upload')}
+              className="bg-[#1C1C1C] text-white px-6 py-3 rounded-xl font-medium text-sm hover:bg-[#2E2E2E] transition"
+            >
+              Update Style Photos
+            </button>
+          </div>
+        )}
+
+        {/* Saved items count */}
+        {savedIds.size > 0 && (
+          <div className="fixed bottom-6 right-6 bg-[#1C1C1C] text-white px-4 py-2.5 rounded-full shadow-lg text-sm font-medium flex items-center gap-2 z-30">
+            <svg className="w-4 h-4 fill-[#C9A96E]" viewBox="0 0 24 24">
+              <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            {savedIds.size} saved
+          </div>
+        )}
       </main>
     </div>
   )

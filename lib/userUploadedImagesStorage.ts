@@ -1,44 +1,25 @@
-import { v4 as uuidv4 } from 'uuid'
-import { userModel } from '../model/user'
-import { userUploadedImagesModel } from '../model/userUploadedImages'
-import { StyleProfile } from '../model/userStyleprofile'
+import { userUploadedImagesModel } from '@/model/userUploadedImages'
 
-export const getStyleProfile = (userId: string): StyleProfile | undefined => {
-  const profiles = localStorage.getItem('styleProfiles')
-  const allProfiles = profiles ? JSON.parse(profiles) : []
-  return allProfiles.find((p: StyleProfile) => p.userId === userId)
+const storageKey = (userId: string) => `uploaded_images_${userId}`
+
+export function saveUploadedImages(
+  userId: string,
+  images: userUploadedImagesModel[]
+): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(storageKey(userId), JSON.stringify(images))
 }
 
-export const saveStyleProfile = (userId: string, images: userUploadedImagesModel[]) => {
-  const profiles = localStorage.getItem('styleProfiles')
-  const allProfiles = profiles ? JSON.parse(profiles) : []
-  
-  const existingIndex = allProfiles.findIndex((p: StyleProfile) => p.userId === userId)
-  
-  const newProfile: StyleProfile = {
-    id: uuidv4(),
-    userId,
-    uploadedImages: images,
-    createdAt: Date.now()
+export function getUploadedImages(userId: string): userUploadedImagesModel[] {
+  if (typeof window === 'undefined') return []
+  try {
+    return JSON.parse(localStorage.getItem(storageKey(userId)) ?? '[]')
+  } catch {
+    return []
   }
-  
-  if (existingIndex >= 0) {
-    allProfiles[existingIndex] = { ...allProfiles[existingIndex], ...newProfile }
-  } else {
-    allProfiles.push(newProfile)
-  }
-  
-  localStorage.setItem('styleProfiles', JSON.stringify(allProfiles))
-  return newProfile
 }
 
-export const saveUploadedImages = (userId: string, images: userUploadedImagesModel[]) => {
-  const key = `user_images_${userId}`
-  localStorage.setItem(key, JSON.stringify(images))
-}
-
-export const getUploadedImages = (userId: string): userUploadedImagesModel[] => {
-  const key = `user_images_${userId}`
-  const images = localStorage.getItem(key)
-  return images ? JSON.parse(images) : []
+export function clearUploadedImages(userId: string): void {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(storageKey(userId))
 }
