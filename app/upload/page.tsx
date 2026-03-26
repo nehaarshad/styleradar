@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { getSession } from '@/services/auth'
 import { saveUploadedImages } from '@/lib/userUploadedImagesStorage'
 import { saveStyleProfile, saveStyleAnalysis } from '@/lib/styleAnalyzer'
 import { userUploadedImagesModel } from '@/model/userUploadedImages'
 import { userModel } from '@/model/user'
 import { v4 as uuidv4 } from 'uuid'
+import { getCurrentUser } from '@/lib/userStorage'
 
 const MAX_IMAGES = 5
 const MAX_SIZE_MB = 4
@@ -31,7 +31,7 @@ export default function UploadPage() {
   const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
-    const session = getSession()
+    const session = getCurrentUser()
     if (!session) router.push('/login')
     else setUser(session)
   }, [router])

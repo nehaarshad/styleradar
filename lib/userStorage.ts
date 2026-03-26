@@ -1,55 +1,19 @@
-import { userModel } from '../model/user'
-import { v4 as uuidv4 } from 'uuid'
-
-// User functions
-export const getUsers = (): userModel[] => {
-  if (typeof window === 'undefined') return []
-  const users = localStorage.getItem('users')
-  return users ? JSON.parse(users) : []
-}
-
-export const saveUser = (user: userModel) => {
-  const users = getUsers()
-  
-  // Check if email exists
-  const existingUser = users.find(u => u.email === user.email)
-  if (existingUser) {
-    throw new Error('User already exists')
-  }
-
-  const newUser: userModel = {
-    ...user,
-    id: uuidv4(),
-  }
-  
-  users.push(newUser)
-  localStorage.setItem('users', JSON.stringify(users))
-  return newUser
-}
-
-export const findUserByEmail = (email: string): userModel | undefined => {
-  const users = getUsers()
-  return users.find(u => u.email === email)
-}
-
 // Session functions
-export const createSession = (user: userModel) => {
-  if (typeof window === 'undefined') return
+export const createSession = (id:unknown,username:string) => {
   localStorage.setItem('currentUser', JSON.stringify({
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    loggedInAt: Date.now()
+    id: id,
+    username: username,
   }))
+
+  console.log('Session created for user:', { id, username })
 }
 
 export const getCurrentUser = () => {
-  if (typeof window === 'undefined') return null
   const user = localStorage.getItem('currentUser')
+  console.log('Retrieving current user from storage:', user) // Debug log
   return user ? JSON.parse(user) : null
 }
 
-export const logout = () => {
-  if (typeof window === 'undefined') return
+export const endSession = () => {
   localStorage.removeItem('currentUser')
 }

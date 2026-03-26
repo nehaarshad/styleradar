@@ -6,4 +6,5 @@ export interface StyleDNAModel {
   aestheticKeywords: string[]
   description: string
   analyzedAt?: number
+  created_at: string 
 }

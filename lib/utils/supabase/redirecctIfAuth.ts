@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
-import { createActionClient } from './actions';
+import { createServerSupabase } from './server';
 
 
 export async function redirectIfAuthenticated(path = '/feed') {
-  const supabase = await createActionClient();
+   const supabase = await createServerSupabase()  
   const { data } = await supabase.auth.getUser();
 
   if (data?.user) {

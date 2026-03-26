@@ -1,30 +1,15 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { StyleDNAModel } from '@/model/userStyleDNA'
-import { supabase } from '@/lib/utils/supabase/client'
+import { SYSTEM_PROMPT } from '@/lib/utils/const/systemPrompt'
 import { v4 as uuidv4 } from 'uuid';
+import { createServerSupabase } from '@/lib//utils/supabase/server'
+
 
 const MODEL_CANDIDATES = [
  'models/gemini-2.5-flash',
   'models/gemini-2.0-flash',
 ]
-
-const SYSTEM_PROMPT = `You are an expert fashion stylist AI. Analyze the provided outfit images and extract the user's unique style DNA.
-
-Return a JSON object with EXACTLY these keys:
-{
-  "silhouettePrefs": ["string", ...],   // e.g. ["oversized", "bodycon"]
-  "colorPalette": ["string", ...],      // e.g. ["earth tones",  "ivory"]
-  "fabricTypes": ["string", ...],       // e.g. ["lawn", "cotton", "chiffon"]
-  "occasionStyle": "string",            // e.g. "casual", "formal", "streetwear", "semi-formal"
-  "aestheticKeywords": ["string", ...], // e.g. ["boho", "minimalist", "classic", "desi-chic"]
-  "description": "string"              // 2-3 sentences describing overall style
-}
-
-IMPORTANT: 
-- Return ONLY the raw JSON object. No markdown, no backticks, no explanation.
-- Be specific to South Asian/Pakistani fashion where relevant (lawn, kurta, shalwar kameez, embroidery, etc.)
-- Include at least 3 items per array field.`
 
 export async function POST(request: Request) {
   try {
@@ -53,14 +38,14 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(`📸 Analyzing ${images.length} images...`)
+    console.log(`Analyzing ${images.length} images...`)
 
     const genAI = new GoogleGenerativeAI(apiKey)
 
     const imageParts = images.map((img: string) => {
-      // Strip data URL prefix if present
+
       const base64 = img.includes(',') ? img.split(',')[1] : img
-      // Detect mime type from data URL prefix
+
       const mimeType = img.startsWith('data:image/png')
         ? 'image/png'
         : img.startsWith('data:image/webp')
@@ -75,7 +60,7 @@ export async function POST(request: Request) {
 
     for (const modelName of MODEL_CANDIDATES) {
       try {
-        console.log(`🤖 Trying model: ${modelName}`)
+        console.log(`Trying model: ${modelName}`)
         const model = genAI.getGenerativeModel({ model: modelName })
         const result = await model.generateContent([SYSTEM_PROMPT, ...imageParts])
         const text = result.response.text().trim()
@@ -97,21 +82,31 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(`✅ Style DNA extracted using ${usedModel}`)
     if (styleDNA) {
-      const { data: { user } } = await supabase.auth.getUser();
 
+      const supabase = await createServerSupabase()
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+if (!user) {
+  return NextResponse.json(
+    { error: 'Unauthorized - user not logged in' },
+    { status: 401 }
+  )
+}
+  
+  console.log('User from storage:', user);
     const { error: profileError } = await supabase
       .from('style_dna')
       .insert({
         id: uuidv4(),
-        silhouette_prefs: styleDNA.silhouettePrefs,
-        color_palette: styleDNA.colorPalette,
-        fabric_types: styleDNA.fabricTypes,
-        occasion_style: styleDNA.occasionStyle,
+        silhouettePrefs: styleDNA.silhouettePrefs,
+        colorPalette: styleDNA.colorPalette,
+        fabricTypes: styleDNA.fabricTypes,
+        occasionStyle: styleDNA.occasionStyle,
         aestheticKeywords: styleDNA.aestheticKeywords,
         description: styleDNA.description,
-        user_id: user?.id ?? 'unknown',
+        user_id: user?.id ,
         created_at: new Date().toISOString(),
       });
 

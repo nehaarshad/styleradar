@@ -32,7 +32,7 @@ export const RETAILERS: Record<string, RetailerConfig> = {
       image: '.tile-image, img[src*="images/hi-res"], .image-container img',
       name: '.pdp-link-heading, .product-brand .text-truncate, h2.pdp-link-heading',
       price: '.price .value, .sales .value, .cc-price',
-      link: 'a.plpRedirectPdp, .pdp-link a, a[data-href*=".html"], a[href*=".html"]',
+      link: 'a.plpRedirectPdp',
     },
     waitFor: 8000,
     waitUntil: 'networkidle',

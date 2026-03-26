@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { login, signup } from '@/app/(auth)/actions'
+import { createSession } from '@/lib/userStorage'
+
 
 export default function LoginPage() {
   const router = useRouter()
@@ -21,12 +22,48 @@ export default function LoginPage() {
 
     try {
       if (mode === 'login') {
-        const result = await login(form.email, form.password)
+
+          const res = await fetch('/api/login', {
+              method: 'POST',
+              body: JSON.stringify({ email: form.email, password: form.password }),
+            })
+
+          const data = await res.json()
+          console.log("LOGIN RESPONSE DATA:", data)
+
+          if (data.error) { 
+            console.error(data.error)
+            return
+          }
+
+          console.log("LOGIN DATA:", data)
+
+          createSession(data.user.id, data.user.user_metadata?.username )
+
+          router.push('/feed')
         
-      } else {
-        const result = await signup(form.email, form.password, form.username)
+      } 
+      else {
+              const  data = await fetch('/api/signup', {
+                    method: 'POST',
+                    body: JSON.stringify({ email: form.email, password: form.password ,username: form.username}),
+                  })
+                .then(res => res.json())
+                .catch(err => {
+                  console.error('Signup error:', err);
+                  setError('Failed to create account. Please try again.');
+                });
+                  
+                createSession(
+                  data.user?.id,
+                  data.user?.user_metadata?.username
+                )
+
+                
+          router.push('/upload') 
         
       }
+
     } catch (err) {
       setError('An unexpected error occurred')
       console.error(err)

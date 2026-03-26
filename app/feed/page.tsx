@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { getSession, logout } from '@/services/auth'
 import { getUploadedImages } from '@/lib/userUploadedImagesStorage'
 import { getStyleAnalysis } from '@/lib/styleAnalyzer'
 import { userModel } from '@/model/user'
@@ -11,8 +10,8 @@ import { userUploadedImagesModel } from '@/model/userUploadedImages'
 import { StyleDNAModel } from '@/model/userStyleDNA'
 import { ProductModel } from '@/model/product'
 import { ProductCard } from '../components/ui/productCard'
-import { MatchBadge } from '../components/ui/matchBadge'
 import LogoutButton from '../components/ui/logoutbutton'
+import { getCurrentUser } from '@/lib/userStorage'
 
 export default function FeedPage() {
   const router = useRouter()
@@ -61,7 +60,7 @@ export default function FeedPage() {
   }, [])
 
   useEffect(() => {
-    const session = getSession()
+    const session = getCurrentUser()
     if (!session) { router.push('/login'); return }
 
     setUser(session)
@@ -97,18 +96,12 @@ export default function FeedPage() {
             <div className="flex items-center gap-3">
               {styleDNA && (
                 <button
-                  onClick={() => setShowDNA(!showDNA)}
+                  onClick={() => router.push('/profile')}
                   className="text-xs bg-[#F5F1EB] text-[#8B5E3C] px-3 py-1.5 rounded-full hover:bg-[#EDE7DC] transition font-medium"
                 >
-                  {showDNA ? 'Hide' : 'View'} Style DNA
+                  View Style DNA
                 </button>
               )}
-              <button
-                onClick={() => router.push('/upload')}
-                className="text-xs text-[#6B6B6B] hover:text-[#1C1C1C] transition"
-              >
-                Re-upload
-              </button>
               <LogoutButton />
             </div>
           </div>
@@ -171,10 +164,10 @@ export default function FeedPage() {
           </div>
           {styleDNA && !loading && (
             <button
-              onClick={() => loadProducts(styleDNA)}
+            onClick={() => router.push('/upload')}
               className="text-xs font-medium text-[#C9A96E] border border-[#C9A96E]/40 px-3 py-1.5 rounded-full hover:bg-[#FDF9F3] transition"
             >
-              Refresh Feed
+              Re-upload
             </button>
           )}
         </div>

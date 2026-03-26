@@ -5,21 +5,18 @@ import { ProductModel } from '@/model/product'
 import { StyleDNAModel } from '@/model/userStyleDNA'
 import { calculateStyleMatch } from '@/lib/styleMatching'
 
-// ── In-process cache + in-flight deduplication ───────────────────────────────
 interface CacheEntry {
   products: ProductModel[]
   expiresAt: number
 }
 const CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
 const cache = new Map<string, CacheEntry>()
-// Prevent simultaneous duplicate requests (React Strict Mode fires effects twice)
 const inFlight = new Map<string, Promise<ProductModel[]>>()
 
 function getCacheKey(retailers: string[], keywords: string[]): string {
   return `${[...retailers].sort().join(',')}::${[...keywords].sort().join(',')}`
 }
 
-// ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -38,15 +35,13 @@ export async function POST(request: Request) {
     // 1. Serve from cache
     const cached = cache.get(cacheKey)
     if (cached && Date.now() < cached.expiresAt) {
-      console.log('📦 Serving cached products')
+      console.log('Serving cached products')
       return NextResponse.json({
         products: rankProducts(cached.products, styleDNA),
         cached: true,
         count: cached.products.length,
       })
     }
-
-    // 2. Deduplicate in-flight (React Strict Mode / double-render guard)
     let scrapePromise = inFlight.get(cacheKey)
     if (!scrapePromise) {
       scrapePromise = runScrape(retailers, keywords, cacheKey)
@@ -93,7 +88,7 @@ async function runScrape(
   try {
     scraper = new PlaywrightScraper()
     const products = await scraper.searchMultipleRetailers(
-      keywords.slice(0, 3),
+      keywords,
       retailers
     )
     cache.set(cacheKey, { products, expiresAt: Date.now() + CACHE_TTL })
@@ -103,7 +98,6 @@ async function runScrape(
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function generateSearchKeywords(dna: StyleDNAModel): string[] {
   const kws = new Set<string>()
 
@@ -112,7 +106,7 @@ function generateSearchKeywords(dna: StyleDNAModel): string[] {
   dna.occasionStyle && kws.add(dna.occasionStyle)
   dna.aestheticKeywords?.slice(0, 3).forEach(k => kws.add(k))
   dna.silhouettePrefs?.slice(0, 1).forEach(s => kws.add(s))
-  dna.colorPalette?.slice(0, 1).forEach(c => kws.add(c))
+  dna.colorPalette?.slice(0, 2).forEach(c => kws.add(c))
 
   return [...kws].filter(k => k && k.length > 2).slice(0, 6)
 }
@@ -120,7 +114,6 @@ function generateSearchKeywords(dna: StyleDNAModel): string[] {
 function rankProducts(products: ProductModel[], styleDNA: StyleDNAModel): ProductModel[] {
   return products
     .map(p => ({ ...p, matchScore: calculateStyleMatch(p, styleDNA) }))
-    // Lower threshold: show all scraped products, even weak matches
     .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
     .slice(0, 60)
 }

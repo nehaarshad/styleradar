@@ -7,7 +7,7 @@ const dnaKey = (userId: string) => `style_dna_${userId}`
 const profilesKey = 'styleProfiles'
 
 export function saveStyleAnalysis(userId: string, styleDNA: StyleDNAModel): void {
-  if (typeof window === 'undefined') return
+
   localStorage.setItem(
     dnaKey(userId),
     JSON.stringify({ ...styleDNA, analyzedAt: Date.now() })
@@ -15,7 +15,6 @@ export function saveStyleAnalysis(userId: string, styleDNA: StyleDNAModel): void
 }
 
 export function getStyleAnalysis(userId: string): StyleDNAModel | null {
-  if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(dnaKey(userId))
     return raw ? (JSON.parse(raw) as StyleDNAModel) : null

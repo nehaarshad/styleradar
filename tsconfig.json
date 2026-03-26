@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "lib/utils/supabase/redirecctIfAuth.ts", "lib/utils/supabase/server.js", "lib/utils/supabase/middleware.js", "lib/utils/supabase/client.js", "lib/utils/supabase/actions.js", "lib/utils/supabase/uredirectIfNotAuth.ts"  ],
+, "lib/utils/supabase/redirecctIfAuth.ts", "lib/utils/supabase/server.ts", "lib/utils/supabase/middleware.js", "lib/utils/supabase/client.js", "lib/utils/supabase/actions.js", "lib/utils/supabase/uredirectIfNotAuth.ts"  ],
   "exclude": ["node_modules"]
 }
