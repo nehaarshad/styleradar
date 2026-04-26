@@ -26,11 +26,11 @@ export const RETAILERS: Record<string, RetailerConfig> = {
     name: 'Khaadi',
     baseUrl: 'https://pk.khaadi.com',
     selectors: {
-      productContainer: '.product-tile, .product, .tile',
+      productContainer: '.product-tile',
       image: '.tile-image, img',
-      name: '.product-name, .pdp-link-heading, .tile-title',
-      price: '.price .value, .sales .value',
-      link: 'a',
+      name: '.pdp-link-heading, .product-name, .tile-title, h2, h3',
+      price: '.price .value, .sales .value, .cc-price',
+      link: 'a.plpRedirectPdp, a',
     },
   },
 }
