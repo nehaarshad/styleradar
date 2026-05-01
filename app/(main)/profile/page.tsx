@@ -84,6 +84,7 @@ export default function ProfilePage() {
           
           fetchHistory()
         }, [])
+
   return (
     <div className="min-h-screen" style={{ background: '#FAF8F5' }}>
       {/* ── Nav ── */}
@@ -149,12 +150,7 @@ export default function ProfilePage() {
                   </svg>
                 </div>
                 <p className="text-[#6B6B6B] mb-4">{`You haven't analyzed your style yet`}</p>
-                <button
-                  onClick={() => router.push('/upload')}
-                  className="bg-[#1C1C1C] text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-[#2E2E2E] transition"
-                >
-                  Analyze Your Style
-                </button>
+                
               </div>
             )}
           </>

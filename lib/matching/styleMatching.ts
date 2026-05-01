@@ -10,7 +10,7 @@ export interface Product {
   retailer: string
   description: string
   tags: string[]
-  match_score?: number
+  match_score? : number
 }
 
 export interface StyleDNA {
@@ -34,12 +34,6 @@ export interface FeedState {
   allScoredProducts: Product[]
   brands: BrandWithCount[]
 }
-
-// ─── Constants ─────────────────────────────────────────────────────────────────
-
-// Minimum score a product must reach to appear in the feed at all.
-// Score breakdown: aesthetic(40) + colors(20) + occasion(20) + fabric(10) + silhouette(10) = 100
-// A threshold of 25 means the product must match at least one major category meaningfully.
 export const MATCH_THRESHOLD = 25
 
 // Max products shown per brand tab (prevents infinite scroll while keeping variety)
@@ -168,17 +162,6 @@ export function normalizeBrand(raw: string): string {
     .join(' ')
 }
 
-// ─── Feed Builder ──────────────────────────────────────────────────────────────
-
-/**
- * Given all DB products and a StyleDNA, returns:
- * - allScoredProducts: only products that meet MATCH_THRESHOLD, sorted by score desc
- * - brands: tab list with per-brand counts (capped at MAX_PER_BRAND each)
- *
- * The "all" tab shows the top MAX_ALL products across all brands.
- * Each brand tab shows only that brand's matching products (up to MAX_PER_BRAND).
- * Products below MATCH_THRESHOLD are completely excluded.
- */
 export function buildFeedState(rawProducts: Product[], dna: StyleDNA): FeedState {
   // Score every product
   const scored = rawProducts.map(p => ({
@@ -191,7 +174,6 @@ export function buildFeedState(rawProducts: Product[], dna: StyleDNA): FeedState
     .filter(p => (p.match_score ?? 0) >= MATCH_THRESHOLD)
     .sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
 
-  // Build per-brand counts from ALL matching products (not just the visible slice)
   const brandMap = new Map<string, number>()
   matching.forEach(p => {
     const brand = normalizeBrand(p.brand || p.retailer)
@@ -209,10 +191,6 @@ export function buildFeedState(rawProducts: Product[], dna: StyleDNA): FeedState
 
   return { allScoredProducts: matching, brands }
 }
-
-/**
- * Returns the visible product slice for a given brand tab.
- */
 export function getProductsForBrand(allScoredProducts: Product[], brandName: string): Product[] {
   if (brandName === 'all') {
     return allScoredProducts.slice(0, MAX_ALL)

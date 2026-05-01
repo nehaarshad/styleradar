@@ -18,11 +18,11 @@ export function HistoryCard({
   const [expanded, setExpanded] = useState(false)
   
   // Handle both camelCase and snake_case field names
-  const silhouettePrefs = record.silhouettePrefs || []
-  const colorPalette = record.colorPalette || []
-  const fabricTypes = record.fabricTypes || []
-  const aestheticKeywords = record.aestheticKeywords || []
-  const occasionStyle = record.occasionStyle || ''
+  const silhouettePrefs = record.silhouette_prefs || []
+  const colorPalette = record.color_palette || []
+  const fabricTypes = record.fabric_types || []
+  const aestheticKeywords = record.aesthetic_keywords || []
+  const occasionStyle = record.occasion_style || ''
 
   return (
     <div className="flex gap-4">

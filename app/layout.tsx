@@ -7,6 +7,12 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Style Radar - Personalized Fashion Discovery',
   description: 'Discover fashion that matches your unique style',
+ manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'StyleRadar',
+  },
 }
 
 export default function RootLayout({
