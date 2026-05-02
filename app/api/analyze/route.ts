@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server.'
+import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { StyleDNAModel } from '@/model/userStyleDNA'
 import { v4 as uuidv4 } from 'uuid'
