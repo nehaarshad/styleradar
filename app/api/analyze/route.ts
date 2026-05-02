@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server.'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { StyleDNAModel } from '@/model/userStyleDNA'
 import { v4 as uuidv4 } from 'uuid'
@@ -108,11 +108,11 @@ export async function POST(request: Request) {
       .insert({
         id: uuidv4(),
         user_id: user.id,
-        silhouette_prefs: styleDNA.silhouettePrefs,
-        color_palette: styleDNA.colorPalette,
-        fabric_types: styleDNA.fabricTypes,
-        occasion_style: styleDNA.occasionStyle,
-        aesthetic_keywords: styleDNA.aestheticKeywords,
+        silhouette_prefs: styleDNA. silhouette_prefs,
+        color_palette: styleDNA.color_palette,
+        fabric_types: styleDNA.fabric_types,
+        occasion_style: styleDNA.occasion_style,
+        aesthetic_keywords: styleDNA.aesthetic_keywords,
         description: styleDNA.description,
         created_at: new Date().toISOString(),
       })
